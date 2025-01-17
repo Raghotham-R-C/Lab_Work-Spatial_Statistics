@@ -1,0 +1,160 @@
+---
+title: "2348141_Assignment 2"
+author: "Raghotham (2348141)"
+date: "2024-10-14"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+---
+
+## Introduction 
+
+Spatial analysis refers to the process of examining the locations, attributes, and relationships of features in spatial datasets, typically represented by geographic coordinates. This type of analysis is widely used across disciplines such as urban planning, public health, crime mapping, and transportation to understand how different spatial features are distributed and how they interact with one another.
+
+## Objective
+
+1. Visualize the spatial distribution of the chosen variable
+
+2. Calculate Global Moran’s I to assess overall spatial autocorrelation and interpret the results.
+
+3. Further, identify local clusters by calculating Local Moran’s I to detect areas of significant local spatial autocorrelation.
+
+4. Create and interpret a Moran’s scatter plot, explaining how it highlights high-high, low-low, and outlier regions.
+
+5. Present your findings with appropriate maps and plots, interpreting both global and local spatial patterns.
+
+## Analysis
+
+### 1. 
+
+```{r}
+library(spdep)
+library(sf)
+library(sp)
+library(spData)
+library(tmap)
+library(spatialreg)
+
+data(world)
+
+tm_shape(world) +
+  tm_polygons("lifeExp", palette = "-RdYlGn", title = "Life Expectancy") +
+  tm_layout(title = "Spatial Distribution of Life Expectancy", legend.outside = TRUE)
+```
+
+**Interpretation**
+
+The map illustrates significant global disparities in life expectancy, influenced by factors such as healthcare, economic conditions, and social stability.
+
+```{r}
+# Clean the data by removing NAs from lifeExp
+world_clean <- world[!is.na(world$lifeExp), ]
+
+# Create a neighbors list based on country borders
+nb <- poly2nb(world_clean)
+```
+
+### 2.
+
+```{r}
+# Step (ii): Calculate Global Moran's I for life expectancy
+lw_clean <- nb2listw(nb, style = "W", zero.policy = TRUE)
+
+global_moran <- moran.test(world_clean$lifeExp, lw_clean, zero.policy = TRUE)
+
+print(global_moran)
+
+```
+
+```{r}
+# Interpretation of Global Moran's I result
+cat("Global Moran's I:", global_moran$estimate["Moran I statistic"], "\n")
+
+cat("P-value:", global_moran$p.value, "\n")
+```
+
+**Interpertation**
+
+- The Global Moran's I for life expectancy is 0.6833899, indicating a strong positive spatial autocorrelation, meaning regions with similar life expectancy values (high or low) are clustered together. 
+
+- The expected Moran's I under the null hypothesis of no spatial autocorrelation is -0.0067, while the observed value is significantly higher. 
+
+- The test statistic's standard deviate of 10.617 and the p-value of < 2.2e-16 show that this result is highly statistically significant, rejecting the null hypothesis. 
+
+- Life expectancy is not randomly distributed but exhibits significant clustering across the regions.
+
+### 3.
+
+```{r}
+local_moran <- localmoran(world_clean$lifeExp, lw_clean, zero.policy = TRUE)
+# Append Local Moran's I to the world_clean dataset
+world_clean$local_moran_I <- local_moran[, 1]
+world_clean$local_moran_p <- local_moran[, 5]
+# Visualize areas with significant local spatial autocorrelation (p-value < 0.05)
+tm_shape(world_clean) +
+  tm_polygons("local_moran_p", style = "fixed", breaks = c(0, 0.05, 1), 
+  palette = c("red", "white"), title = "Local Moran's I (p-value)") +
+  tm_layout(title = "Significant Local Spatial Autocorrelation", legend.outside = TRUE)
+```
+
+**Interpertation**
+
+The map highlights significant clustering in specific regions, particularly in Africa, which may indicate localized socio-economic or environmental factors affecting the variable studied. In contrast, most other areas show either non-significant autocorrelation or missing data, suggesting a more homogeneous distribution.
+
+### 4.
+
+```{r}
+moran.plot(world_clean$lifeExp, lw_clean, labels = world_clean$name_long, 
+           xlab = "Life Expectancy", ylab = "Spatial Lag of Life Expectancy",
+           main = "Moran's Scatterplot")
+
+```
+
+**Interpertation**
+
+The Moran’s scatterplot visually represents the relationship between Life Expectancy and its spatial lag (the average life expectancy of neighboring regions). The plot is divided into four quadrants:
+
+- **Top-right quadrant (High-High):** Regions with high life expectancy are surrounded by neighbors with similarly high values, indicating positive spatial autocorrelation.
+
+- **Bottom-left quadrant (Low-Low):** Regions with low life expectancy are clustered near other low-life expectancy regions, reinforcing clustering.
+
+- **Top-left (Low-High)** and **Bottom-right (High-Low):** These outliers indicate regions where life expectancy differs from their neighbors.
+
+```{r}
+quadrant <- vector("numeric", length = nrow(local_moran))
+mean_lifeExp <- mean(world_clean$lifeExp)
+# Quadrant classification based on local moran's I values and mean
+quadrant[world_clean$lifeExp > mean_lifeExp & local_moran[, 1] > 0] <- "High-High"
+quadrant[world_clean$lifeExp < mean_lifeExp & local_moran[, 1] > 0] <- "Low-Low"
+quadrant[world_clean$lifeExp > mean_lifeExp & local_moran[, 1] < 0] <- "High-Low"
+quadrant[world_clean$lifeExp < mean_lifeExp & local_moran[, 1] < 0] <- "Low-High"
+# Add the quadrant classification to the dataset
+world_clean$quadrant <- factor(quadrant, levels = c("High-High", "Low-Low", "High-Low", "Low-High"))
+# Map of Local Moran's I clusters
+tm_shape(world_clean) +
+  tm_polygons("quadrant", palette = c("darkgreen", "darkred", "lightblue", "pink"), title = "Local Spatial Clusters") +
+  tm_layout(title = "Clusters Based on Local Moran's I", legend.outside = TRUE)
+```
+
+**Interpertation**
+
+This world map depicts local spatial clusters using Moran's I statistic, revealing global patterns of an unspecified variable. It shows clear regional trends: 
+
+- High-High clusters (dark green) dominate North America, South America, and parts of Europe, indicating areas with high values surrounded by similar neighbors.
+
+- Low-Low clusters (red) are prevalent in Africa and parts of the Middle East, showing regions with low values adjacent to other low-value areas.
+
+- High-Low outliers (pink) appear in Russia and Central Asia, representing high-value areas surrounded by low-value neighbors.
+
+- Low-High outliers (light blue) are scattered globally.
+
+The map highlights a stark global North-South divide, suggesting significant inequality in the measured variable. This visualization effectively illustrates spatial autocorrelation patterns and regional disparities on a global scale.
+
+## Conclusion
+
+The spatial analysis of life expectancy reveals significant global patterns of spatial autocorrelation, as demonstrated through both Global and Local Moran's I statistics. The Global Moran’s I value of 0.683 indicates a strong positive spatial autocorrelation, meaning that countries with similar life expectancy levels tend to cluster together. 
+
+Local Moran’s I further identifies regional clusters of life expectancy. High-High clusters are concentrated in regions like North America, Europe, and South America, where life expectancy is high and neighboring countries exhibit similar high values. In contrast, Low-Low clusters dominate in Africa and parts of the Middle East, reflecting areas with lower life expectancy, likely due to poorer healthcare and economic challenges. Outliers, such as High-Low regions in Russia and Central Asia, highlight areas where life expectancy significantly differs from neighboring countries.
+
+These findings suggest that life expectancy is not randomly distributed across the globe but is influenced by geographic, economic, and political factors, leading to spatial inequalities.
