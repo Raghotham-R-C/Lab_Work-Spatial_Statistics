@@ -1,0 +1,181 @@
+---
+title: "2348141_Assignment 6"
+author: "Raghotham (2348141)"
+date: "2024-11-24"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Introduction :
+
+Spatial data often requires quantifying spatial dependence through variograms, which are essential tools in geostatistics. A variogram captures how spatial variability changes with distance, offering insights into underlying spatial patterns. The empirical variogram provides an initial estimate based on observed data, while theoretical models like the Spherical, Exponential, and Gaussian variograms are used to fit and interpret these observations. Comparing the goodness-of-fit of these models ensures the selection of an appropriate spatial structure. Residual analysis, through residual variograms, helps assess the adequacy of the fitted model and reveals any remaining spatial dependence. This study uses the coalash dataset to explore these concepts, aiming to evaluate and interpret spatial patterns effectively.
+
+## Objective :
+
+1. Calculate the empirical variogram for distances ranging from 0 to a specified maximum range.
+
+2. Fit common theoretical variogram models (Spherical, Exponential, Gaussian) to an empirical variogram. 
+
+3. Compare their performance based on goodness-of-fit metrics
+
+4. Fit a variogram compute the residual variogram. What does the shape of the residual variogram suggest about the model’s performance?
+
+4. Discuss whether the residual variogram indicates that spatial dependence remains in the residuals.
+
+## Data Description :
+
+Data obtained from Gomez and Hazen (1970, Tables 19 and 20) on coal ash for the Robena Mine Property in Greene County Pennsylvania.
+
+- **x** - a numeric vector, x-coordinate
+
+- **y** - a numeric vector, x-coordinate
+
+- **coalash** -  the target variable
+
+## Analysis :
+
+### 1.
+
+```{r}
+# Load necessary libraries
+library(gstat)
+library(sp)
+
+# Load the coalash dataset
+data(coalash, package = "gstat")
+
+# Inspect the dataset
+str(coalash)
+
+# Convert the data.frame to a SpatialPointsDataFrame
+coordinates(coalash) <- ~x + y
+```
+
+```{r}
+# Define the maximum range for distances
+max_range <- 10 # Adjust based on the data
+
+# Compute the empirical variogram
+emp_variogram <- variogram(coalash ~ 1, coalash, cutoff = max_range)
+
+# Visualize the empirical variogram
+ plot(emp_variogram, main = "Empirical Variogram", xlab = "Distance", ylab = "Semivariance" , pch= 19, col="red")
+```
+
+**Interpretation**
+
+The variogram shows an increasing trend in semivariance as the distance increases, indicating positive spatial autocorrelation in the coalash concentrations at shorter distances.
+
+```{r}
+# Fit theoretical variogram models
+# Spherical Model
+vgm_spherical <- fit.variogram(emp_variogram, model = vgm(1, "Sph", max_range / 2, 0.1))
+
+# Exponential Model
+vgm_exponential <- fit.variogram(emp_variogram, model = vgm(1, "Exp", max_range / 2, 0.1))
+
+# Gaussian Model
+vgm_gaussian <- fit.variogram(emp_variogram, model = vgm(1, "Gau", max_range / 2, 0.1))
+```
+
+
+
+
+```{r}
+# Compare goodness-of-fit metrics (RSS)
+cat("Spherical Model RSS:", attr(vgm_spherical, "SSErr"), "\n")
+
+cat("Exponential Model RSS:", attr(vgm_exponential, "SSErr"), "\n")
+
+cat("Gaussian Model RSS:", attr(vgm_gaussian, "SSErr"), "\n")
+```
+
+**Interpretation**
+
+- The Residual Sum of Squares (RSS) values indicate the goodness-of-fit of the models, with lower values representing better fits. 
+
+- Among the models, the Exponential model has the lowest RSS (1.233615), suggesting it provides the best fit to the empirical variogram data. The Spherical model has a slightly higher RSS (1.372837), making it the second-best fit. The Gaussian model, with the highest RSS (1.874853), is the least suitable for this dataset.
+
+```{r}
+# Visualize fitted variograms
+plot(emp_variogram, vgm_spherical, main = "Spherical Model Fit", xlab = "Distance", ylab = "Semivariance", pch= 19,col="darkred")
+```
+
+**Interpertation**
+
+- The spherical model fits well at short to moderate distances, as the curve aligns closely with the empirical variogram points. At larger distances, the model levels off, consistent with the theoretical behavior of the spherical model.
+
+- This model effectively captures spatial dependence for the range observed, making it a good candidate for explaining the spatial structure.
+
+```{r}
+plot(emp_variogram, vgm_exponential, main = "Exponential Model Fit", xlab =
+"Distance", ylab = "Semivariance", pch= 19 , col="darkgreen")
+```
+
+**Interpertation**
+
+- The exponential model rises more gradually compared to the spherical model, especially at shorter distances. While it follows the trend of the empirical variogram, it appears to slightly underestimate the semivariance at some distances.
+
+- This model may be suitable for datasets with spatial dependence that decays gradually but could slightly underperform for this dataset due to its slower rise.
+
+```{r}
+plot(emp_variogram, vgm_gaussian, main = "Gaussian Model Fit", xlab = "Distance", ylab = "Semivariance", pch= 19, col= "purple")
+```
+
+**Interpertation**
+
+- The Gaussian model rises smoothly but deviates more from the empirical points, particularly at short distances, where it underestimates the semivariance. It fits moderately well at larger distances.
+
+- The Gaussian model may not be the best fit for this dataset since its initial rise is slower, and it struggles to capture the observed spatial variability at shorter distances.
+
+```{r}
+# Compute the residual variogram for the fitted spherical model
+# Get the theoretical variogram values for the distances in emp_variogram
+fitted_values <- variogramLine(vgm_spherical, maxdist = max(emp_variogram$dist), dist_vector = emp_variogram$dist)
+
+# Calculate residuals
+residual_variogram <- emp_variogram
+residual_variogram$gamma <- emp_variogram$gamma - fitted_values$gamma
+
+# Plot the residual variogram
+plot(residual_variogram$dist, residual_variogram$gamma, type = "b", main = "Residual Variogram",
+     xlab = "Distance", ylab = "Residual Semivariance",
+     col = "blue", pch = 19)
+```
+
+**Interpretation**
+
+- The residual variogram indicates that the residuals exhibit some degree of spatial dependence, particularly within a distance of 10 units. 
+
+- This suggests that residuals at nearby locations tend to be more similar than those at distant locations. The variogram's shape and trend can be used to assess the fit of the underlying model, with significant structure potentially indicating a need for model refinement. 
+
+- Further analysis, such as fitting a theoretical model to the variogram, can provide more precise estimates of spatial parameters for kriging or other geostatistical applications.
+
+## Conclusion :
+
+The study highlights the importance of variogram analysis in understanding spatial dependence and fitting theoretical models to empirical data. Among the models fitted to the empirical variogram of the coalash dataset, the Exponential model demonstrated the best performance with the lowest RSS, suggesting it captures the spatial structure more accurately. The Spherical model, while slightly less precise, also performed well and aligned closely with the data trends.
+
+The analysis of the residual variogram revealed residual spatial dependence, particularly at shorter distances (up to 10 units), indicating that the models did not fully account for spatial variability. This residual structure implies that neighboring locations exhibit some degree of similarity that remains unexplained by the fitted models. The residual variogram's shape suggests potential opportunities for further model refinement to better capture this dependence.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
