@@ -1,0 +1,217 @@
+---
+title: "Spatial Analysis Assignment 1"
+author: "Raghotham (2348141)"
+date: "2024-10-07"
+output: word_document
+always_allow_html: true
+---
+## Introduction 
+
+Spatial analysis refers to the process of examining the locations, attributes, and relationships of features in spatial datasets, typically represented by geographic coordinates. This type of analysis is widely used across disciplines such as urban planning, public health, crime mapping, and transportation to understand how different spatial features are distributed and how they interact with one another.
+
+## Objective
+
+1. Generate a dataset of 200 hospitals located in Bengaluru. Ensure that the dataset includes the following fields: Hospital ID, Latitude and Longitude.
+
+2. Create a Spatial Dataset for Schools in Bengaluru Create a dataset of 50 Schools in Bengaluru 
+
+3. Import a dataset of crime points with spatial coordinates of the given location.
+
+4. Plot the hospitals, schools, and crime points on the same map using different colours or markers for each dataset.
+
+5. Analyse the spatial distribution of hospitals, schools, and crime points.
+
+## Analysis
+
+### 1. 
+```{r}
+# Load necessary library
+set.seed(123)  # For reproducibility
+
+# Number of hospitals
+n <- 200
+
+# Hospital ID
+hospital_id <- paste("HID", sprintf("%03d", 1:n), sep = "")
+
+lat_min <- 12.85   # Minimum latitude for Bengaluru
+lat_max <- 13.10  # Maximum latitude for Bengaluru
+lon_min <- 77.45   # Minimum longitude for Bengaluru
+lon_max <- 77.75   # Maximum longitude for Bengaluru
+
+latitudes <- runif(n, min = lat_min, max = lat_max)
+longitudes <- runif(n, min = lon_min, max = lon_max)
+
+hospital_data <- data.frame(Hospital_ID = hospital_id,
+                            Latitude = latitudes,
+                            Longitude = longitudes)
+
+head(hospital_data)
+```
+
+**Interpretation**
+
+Generated a dataset of 200 hospitals with random spatial coordinates (latitude and longitude) within the geographic boundaries of Bengaluru. It creates unique hospital IDs (HID001 to HID200) and uses the runif function to generate random latitude and longitude values within specified ranges for Bengaluru. The result is stored in a data frame with columns for Hospital_ID, Latitude, and Longitude.
+
+### 2. 
+
+```{r}
+library(readr)
+school_data <- read_csv("/Users/ragu/Documents/Lab Work - Spatial Statistics/Lab - 1/bengaluru_schools.csv")
+school_data
+```
+
+**Interpretation**
+
+This R code imports a CSV file containing the coordinates of schools in Bengaluru, which were manually obtained using Google Maps. The read_csv function reads the file and stores the school data, including latitude, longitude and School name, ready for further spatial analysis.
+
+### 3.
+
+```{r}
+library(readxl)
+crime_data <- read_excel("/Users/ragu/Documents/Lab Work - Spatial Statistics/Lab - 1/Crime Data.xlsx")
+crime_data
+```
+
+**Interpretation**
+
+Imported the CSV file of the Crime dataset that is given to proceed for further spatial analysis
+
+### 4.
+
+```{r}
+# Install leaflet if you don't have it already
+# install.packages("leaflet")
+
+library(leaflet)
+
+# Create a map with hospitals, schools, and crime points
+m <- leaflet() %>%
+  addTiles() %>%
+  # Plot hospitals in red
+  addCircleMarkers(lng = hospital_data$Longitude, lat = hospital_data$Latitude,
+                   color = "red", radius = 5, label = hospital_data$Hospital_ID,
+                   group = "Hospitals") %>%
+  # Plot schools in blue
+  addCircleMarkers(lng = school_data$Longitude, lat = school_data$Latitude,
+                   color = "blue", radius = 5, label = school_data$School_ID,
+                   group = "Schools") %>%
+  # Plot crime points in black
+  addCircleMarkers(lng = crime_data$Longitude, lat = crime_data$Latitude,
+                   color = "black", radius = 5, label = crime_data$Crime_ID,
+                   group = "Crime Points") %>%
+  # Add a layer control to toggle between datasets
+  addLayersControl(overlayGroups = c("Hospitals", "Schools", "Crime Points"),
+                   options = layersControlOptions(collapsed = FALSE))
+
+# Display the map
+m
+
+```
+
+
+```{r}
+library("ggplot2")
+library("sf")
+
+# Convert hospitals, schools, and crime points to spatial objects
+hospital_sf <- st_as_sf(hospital_data, coords = c("Longitude", "Latitude"), crs = 4326)
+school_sf <- st_as_sf(school_data, coords = c("Longitude", "Latitude"), crs = 4326)
+crime_sf <- st_as_sf(crime_data, coords = c("Longitude", "Latitude"), crs = 4326)
+
+# Extract data back into a regular data frame for plotting
+hospital_df <- as.data.frame(st_coordinates(hospital_sf))
+school_df <- as.data.frame(st_coordinates(school_sf))
+crime_df <- as.data.frame(st_coordinates(crime_sf))
+
+# Add labels to differentiate the datasets
+hospital_df$Type <- "Hospital"
+school_df$Type <- "School"
+crime_df$Type <- "Crime Point"
+
+# Combine all datasets into one data frame
+all_data <- rbind(
+  data.frame(hospital_df, Type = "Hospital"),
+  data.frame(school_df, Type = "School"),
+  data.frame(crime_df, Type = "Crime Point")
+)
+```
+
+```{r}
+# Plot using ggplot2 without background map
+ggplot() +
+  geom_point(data = all_data, aes(x = X, y = Y, color = Type), size = 3) +  # Plot points
+  scale_color_manual(values = c("red", "blue", "yellow")) +  # Set custom colors for each type
+  labs(title = "Hospitals, Schools, and Crime Points in Bengaluru",
+       x = "Longitude", y = "Latitude", color = "Location Type") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))  # Center the title
+
+```
+
+```{r}
+# Plot hospitals
+ggplot(hospital_df, aes(x = X, y = Y)) +
+  geom_point(color = "red", size = 3) +
+  labs(title = "Hospitals in Bengaluru",
+       x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r}
+# Plot schools
+ggplot(school_df, aes(x = X, y = Y)) +
+  geom_point(color = "blue", size = 3) +
+  labs(title = "Schools in Bengaluru",
+       x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r}
+# Plot crime points
+ggplot(crime_df, aes(x = X, y = Y)) +
+  geom_point(color = "black", size = 3) +
+  labs(title = "Crime Points in Bengaluru",
+       x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+```{r}
+# Combine all datasets into one data frame
+all_data <- rbind(
+  data.frame(hospital_df, Type = "Hospital"),
+  data.frame(school_df, Type = "School"),
+  data.frame(crime_df, Type = "Crime Point")
+)
+
+# Plot all data together
+ggplot(all_data, aes(x = X, y = Y, color = Type)) +
+  geom_point(size = 3) +
+  scale_color_manual(values = c("red", "blue", "yellow")) +  # Custom colors
+  labs(title = "Hospitals, Schools, and Crime Points in Bengaluru",
+       x = "Longitude", y = "Latitude", color = "Location Type") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+### 5. 
+
+- From this mapping we can see that the crime data points are located in United states of America and both the hospital and the school data points are located in bangalore.
+
+- The first graph shows that the actual global map to see that the crime points are indicated as black and school points are indicated as Blue and Schools of bangalore are indicated as Red.
+
+- Many subdivisions can be used to differentiate between the three dataset like we can use the cluster analysis to see where the crimes are taking place in America and we can see the density of the hospitals and schools that are spread across Bangalore so that we can understand were should we build more hospitals and schools such that we can improve the economy of the city.
+
+## Conclusion 
+
+The spatial analysis of hospitals, schools, and crime points in Bengaluru provides valuable insights into how essential services and safety risks are distributed across the city. By mapping hospitals and schools against crime hotspots, we gain a clearer understanding of vulnerable areas where public services are exposed to higher risks. Proximity analysis allows us to assess the adequacy of healthcare and education services in relation to crime-prone areas.
+
+In conclusion, spatial analysis serves as a powerful tool for identifying geographic inequalities, optimizing resource distribution, and enhancing safety and accessibility.
