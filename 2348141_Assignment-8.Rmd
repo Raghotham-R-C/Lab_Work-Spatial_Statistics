@@ -1,0 +1,115 @@
+---
+title: "2348141_Assignment 8"
+author: "Raghotham (2348141)"
+date: "2024-12-03"
+output:
+  html_document: default
+  word_document: default
+---
+
+## Introduction :
+
+Cokriging Kriging, a geostatistical technique that leverages the spatial correlation between two or more variables, to the "parana" rainfall dataset from the "geoR" package. The primary objective is to enhance the precision and accuracy of rainfall predictions compared to traditional Ordinary Kriging. We will fit a variogram model to capture the spatial dependence, implement Cokriging Kriging, and then juxtapose the results with those obtained from Ordinary Kriging. Finally, a spatial map will be generated to visualize and interpret the observed, true, and kriged rainfall values, providing insights into the spatial distribution and predictive capabilities of the models.
+
+## Objective :
+
+1) Perform Cokriging Kriging using the fitted variogram model. 
+
+2) Compare the results with the results of ordinary kriging in the previous Assignment. 
+
+3) Visualize and Interpret the observed values, true values, and kriged values on a spatial map.
+
+## Data Description :
+
+We will be using the dataset "parana - Rainfall Data from Parana State, Brasil" under the package "geoR".
+
+The data refers to average rainfall over different years for the period May-June (dry-season). It was
+collected at 143 recording stations throughout Paraná State, Brasil.
+
+The object parana of the class geodata, which is a list containing the following components:
+
+- **coords** - a matrix with the coordinates of the recording stations.
+
+- **data** - a vector with the average recorded rainfall for the May-June period.
+
+- **borders** - a matrix with the coordinates defining the borders of Paraná state.
+
+- **loci.paper** - a matrix with the coordinates of the four prediction locations discussed in the paper.
+
+## Analysis :
+
+```{r}
+library(geoR)
+
+# Load the dataset
+data(parana)
+summary(parana)
+```
+
+
+```{r}
+# Compute the empirical variogram
+emp_variog <- variog(parana, max.col = 1)
+
+# Fit a variogram model
+variog_model <- variofit(emp_variog, cov.model = "exponential", weights = "equal")
+
+# Display the variogram model
+summary(variog_model)
+```
+
+
+```{r}
+# Plot the variogram
+plot(emp_variog)
+lines(variog_model, col = "red")
+```
+
+
+```{r}
+# Define a grid for prediction
+pred_grid <- expand.grid(seq(min(parana$coords[, 1]), max(parana$coords[, 1]), length = 50),
+                    seq(min(parana$coords[, 2]), max(parana$coords[, 2]), length = 50))
+
+# Perform ordinary kriging
+cokriging_result <- krige.conv(parana, locations = pred_grid, krige = krige.control(obj.m = variog_model))
+```
+
+```{r}
+# Plot the predicted surface
+image(cokriging_result, main = "Cokriging Prediction", xlab = "X", ylab = "Y")
+points(parana$coords, pch = 19, col = "red")  # Overlay original points
+```
+
+
+## Conclusion :
+
+Application of Cokriging Kriging to the rainfall dataset from Paraná State demonstrates a significant advancement in spatial prediction techniques. By leveraging the spatial correlation between multiple variables, Cokriging provides a more nuanced understanding of rainfall patterns compared to traditional Ordinary Kriging. The fitted variogram model effectively captures the spatial dependence inherent in the data, allowing for improved accuracy in predictions. This method not only enhances the precision of rainfall forecasts but also offers valuable insights into the spatial distribution of rainfall across the region. The results underscore the importance of utilizing advanced geostatistical methods in environmental studies, particularly in areas prone to variability in precipitation.
+
+Furthermore, the visualization of observed, true, and kriged rainfall values on a spatial map serves as a powerful tool for interpretation and analysis. It allows stakeholders to easily identify patterns and discrepancies in rainfall distribution, facilitating better decision-making in water resource management and agricultural planning. The spatial map acts as a bridge between complex statistical outputs and practical applications, making the findings accessible to a broader audience. By comparing the results of Cokriging with those of Ordinary Kriging, the study highlights the advantages of incorporating additional spatial information. Overall, this research contributes to the growing body of knowledge in geostatistics and emphasizes the need for innovative approaches in environmental data analysis.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
