@@ -1,0 +1,112 @@
+---
+title: "2348141_Assignment 3"
+author: "Raghotham (2348141)"
+date: "2024-10-17"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Introduction 
+
+Spatial autocorrelation is a key concept in spatial analysis, reflecting the degree to which a set of spatial data points are correlated with one another across geographic space. This analysis is crucial in understanding the distribution patterns of crime incidents, as it can reveal whether nearby locations experience similar crime levels. Moran's I statistic is a widely used measure to assess spatial autocorrelation, indicating whether high or low values cluster in specific areas. By applying this statistical tool to the crime dataset, we can visualize and interpret the spatial relationships among crime incidents. The resulting maps and plots will provide insights into patterns of crime occurrence, helping to inform effective crime prevention strategies and resource allocation.
+
+## Objective
+
+Perform Spatial Autocorrelation and Interpret the statistic and also plot Moran's for the same dataset. Present
+your findings with appropriate maps and plots.
+
+## Data Description :
+
+- **Location**: A character vector representing the names of various geographic areas within a city where crime incidents have been reported.
+
+- **Latitude**: A numeric value indicating the geographic latitude of each location, expressed in decimal degrees. This value helps pinpoint the north-south position of the area.
+
+- **Longitude**: A numeric value representing the geographic longitude of each location, also expressed in decimal degrees. This value indicates the east-west position of the area.
+
+- **Total Incidents**: A numeric value indicating the total number of crime incidents recorded in each location. This measure quantifies the level of criminal activity within the specified area.
+
+## Analysis
+
+```{r}
+# Load required libraries
+library(sf)
+library(spdep)
+library(ggplot2)
+library(tmap)
+library(dplyr)
+library(readr)
+
+# Read the Crime dataset (replace with your file path)
+crime_data = read_csv("/Users/ragu/Documents/Lab Work - Spatial Statistics/Lab - 3/Crime Data.csv")
+head(crime_data)
+```
+
+
+```{r}
+# Aggregate crime data to count total incidents per location
+crime_data_agg <- crime_data %>%
+  group_by(Longitude, Latitude) %>%
+  summarise(`Total.Incidents` = sum(`Total Incidents`), .groups = 'drop')
+
+# Create an sf object with longitude and latitude columns
+crime_sf = st_as_sf(crime_data_agg, coords = c("Longitude", "Latitude"), crs = 4326)
+
+# Plotting the crime locations on a map with aspect ratio adjustment
+ggplot() +
+  geom_sf(data = crime_sf, color = "red", size = 1) +
+  coord_sf(xlim = c(-76.71, -76.53), ylim = c(39, 39.4), expand = FALSE) +
+  labs(title = "Crime Locations", x = "Longitude", y = "Latitude") +
+  theme_minimal() +
+  theme(aspect.ratio = 1)# Neighbors
+nb = knn2nb(knearneigh(st_coordinates(crime_sf), k = 5)) # k-nearest neighbors
+nbw = nb2listw(nb, style = "W")
+```
+
+```{r}
+# Global Moran's I
+gmoran = moran.test(crime_data_agg$Total.Incidents, nbw, alternative = "greater")
+print(gmoran)
+```
+```{r}
+# Moran's Plot
+moran.plot(crime_data_agg$Total.Incidents, nbw)
+```
+```{r}
+# Local Moran's I
+lmoran = localmoran(crime_data_agg$Total.Incidents, nbw, alternative = "greater")
+head(lmoran)
+```
+
+```{r}
+# Prepare for mapping
+crime_sf$lmI = lmoran[, "Ii"] # local Moran's I
+crime_sf$lmZ = lmoran[, "Z.Ii"] # z-scores
+crime_sf$p_value = lmoran[, "Pr(z > E(Ii))"] # p-values
+
+# Visualize Total Incidents using dots
+p1 = tm_shape(crime_sf) +
+  tm_dots(col = "Total.Incidents", title = "Total Incidents", style = "quantile") +
+  tm_layout(legend.outside = TRUE)
+
+# Visualize Local Moran's I using dots
+p2 = tm_shape(crime_sf) +
+  tm_dots(col = "lmI", title = "Local Moran's I", style = "quantile") +
+  tm_layout(legend.outside = TRUE)
+
+# Visualize Z-scores using dots
+p3 = tm_shape(crime_sf) +
+  tm_dots(col = "lmZ", title = "Z-score", style = "quantile") +
+  tm_layout(legend.outside = TRUE)
+
+# Visualize p-values using dots
+p4 = tm_shape(crime_sf) +
+  tm_dots(col = "p_value", title = "p-value", style = "quantile") +
+  tm_layout(legend.outside = TRUE)
+
+tmap_arrange(p1, p2, p3, p4)
+```
+
+## Conclusion
+
+This analysis highlights the importance of understanding the spatial distribution of crime incidents. The findings suggest that there is significant spatial autocorrelation, which implies that crime prevention strategies should be tailored to specific high-crime areas. Policymakers and law enforcement agencies can leverage these insights to optimize resource allocation and implement targeted interventions effectively.
