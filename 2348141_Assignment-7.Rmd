@@ -1,0 +1,159 @@
+---
+title: "2348141_Assignment 7"
+author: "Raghotham (2348141)"
+date: "2024-11-25"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Introduction :
+
+Kriging are essential for analyzing environmental data to understand spatial patterns and variability. This study utilizes rainfall data from the Paraná State, Brazil, provided by the geoR package, to explore spatial autocorrelation and generate predictions. By constructing empirical variograms and fitting models, we capture the underlying spatial structure of rainfall. Ordinary Kriging is applied to predict rainfall at unobserved locations, utilizing the fitted variogram model. The observed, residual, and kriged values are then visualized to assess model performance and spatial interpolation accuracy.
+
+## Objective :
+
+1. Define the spatial coordinates and the variable of interest.
+
+2. Create an empirical variogram and fit a variogram model to capture the spatial autocorrelation. Perform the same for the residual and compare the residual and observed variogram plots.
+
+3. Perform Ordinary Kriging using the fitted variogram model.
+
+4. Implement Ordinary Kriging using the gstat or automap package in R.
+
+5. Visualize  and Interpret the observed values, true values, and kriged values on a spatial map.
+
+## Data Description :
+
+We will be using the dataset "parana - Rainfall Data from Parana State, Brasil" under the package "geoR".
+
+The data refers to average rainfall over different years for the period May-June (dry-season). It was
+collected at 143 recording stations throughout Paraná State, Brasil.
+
+The object parana of the class geodata, which is a list containing the following components:
+
+- **coords** - a matrix with the coordinates of the recording stations.
+
+- **data** - a vector with the average recorded rainfall for the May-June period.
+
+- **borders** - a matrix with the coordinates defining the borders of Paraná state.
+
+- **loci.paper** - a matrix with the coordinates of the four prediction locations discussed in the paper.
+
+## Analysis
+
+```{r}
+# Load necessary libraries
+library(geoR)
+library(gstat)
+library(sp)
+library(automap)
+
+# Load the "parana" dataset
+data(parana)
+```
+
+```{r}
+# Combine spatial coordinates and the rainfall data
+spatial_data <- data.frame(parana$coords, rainfall = parana$data)
+colnames(spatial_data) <- c("x", "y", "rainfall")  # Ensure correct column names
+coordinates(spatial_data) <- ~x + y  # Define spatial points for spatial_data
+```
+
+```{r}
+# Compute the empirical variogram
+emp_variogram <- variogram(rainfall ~ 1, spatial_data)
+
+# Plot the empirical variogram
+plot(emp_variogram, main = "Empirical Variogram", xlab = "Distance", ylab = "Semivariance")
+```
+
+**Interprutation**
+
+The empirical variogram depicts how the spatial variability of the rainfall data changes with distance.
+
+- The x-axis represents distance (lag distance) between pairs of spatial points.
+
+- The y-axis represents semivariance, a measure of the dissimilarity of data values at a given lag.
+
+The upward trend indicates increasing dissimilarity with greater distances, which is expected in spatial data. It suggests spatial correlation where closer points are more similar than distant points.
+
+```{r}
+# Fit a variogram model (using a spherical model as an example)
+vgm_model <- fit.variogram(emp_variogram, model = vgm(1, "Sph", 25, 10))
+
+# Plot the empirical variogram with the fitted variogram model
+plot(emp_variogram, vgm_model, main = "Empirical and Fitted Variogram")
+```
+
+**Interprutation**
+
+This plot overlays the empirical variogram with a fitted variogram model and the fitted model captures the spatial dependence structure of the data.
+
+- Nugget (y-intercept): Represents spatial variability at very small distances, including measurement error.
+
+- Range: Distance beyond which there is no spatial correlation (here, ~25 units).
+
+- Sill (asymptote): Total variability of the data (~semivariance of 3000).
+
+The model appears to fit well with the empirical points, indicating the chosen spherical model is appropriate for this data.
+
+```{r}
+# Residual variogram
+fitted_values <- variogramLine(vgm_model, maxdist = max(emp_variogram$dist), dist_vector = emp_variogram$dist)
+residual_variogram <- emp_variogram
+residual_variogram$gamma <- emp_variogram$gamma - fitted_values$gamma
+
+# Plot the residual variogram
+plot(residual_variogram$dist, residual_variogram$gamma, type = "b", main = "Residual Variogram",
+     xlab = "Distance", ylab = "Residual Semivariance")
+```
+
+**Interprutation**
+
+The residual variogram examines the difference between the empirical semivariance and the modeled semivariance.
+
+- The y-axis now shows residual semivariance, which indicates how well the model explains spatial variability.
+
+- Residuals near zero suggest a good fit, while deviations indicate where the model might be lacking.
+
+The plotted residuals reveal whether there is remaining structure in the data that the model does not capture. If the residuals are randomly distributed around zero, the model is satisfactory.
+
+```{r}
+# Define a prediction grid
+x.range <- seq(min(spatial_data$x), max(spatial_data$x), length = 100)
+y.range <- seq(min(spatial_data$y), max(spatial_data$y), length = 100)
+grid <- expand.grid(x = x.range, y = y.range)
+coordinates(grid) <- ~x + y
+gridded(grid) <- TRUE
+
+# Perform Ordinary Kriging
+kriging_result <- krige(rainfall ~ 1, spatial_data, grid, model = vgm_model)
+spplot(kriging_result, "var1.pred", main = "Ordinary Kriging Predictions")
+```
+
+**Interpretation**
+
+- The color scale on the right side represents the predicted rainfall values. The darker the color, the lower the rainfall, and the lighter the color, the higher the rainfall.
+
+- The image shows a spatial pattern of rainfall. There are areas of higher rainfall (yellow/red) and lower rainfall (blue/purple).
+
+- it doesn't explicitly show uncertainty. However, you can infer some level of uncertainty by looking at the smoothness of the predictions. Areas with more rapid color changes suggest higher uncertainty.
+
+```{r}
+# Observed values
+spplot(spatial_data, "rainfall", main = "Observed Rainfall")
+
+# True values (assumed same as observed here)
+spplot(spatial_data, "rainfall", main = "True Rainfall")
+
+# Kriged values
+spplot(kriging_result, "var1.pred", main = "Kriged Values")
+
+```
+
+## Conclusion :
+
+Ordinary Kriging provides a robust statistical method for predicting rainfall at unsampled locations by leveraging spatial correlation derived from sampled data. The generated map visually highlights spatial patterns, indicating areas of high and low rainfall through a color-coded scale. This approach allows researchers to identify spatial variability and trends in rainfall distribution, which can be invaluable for resource planning and environmental management. However, the accuracy of these predictions heavily relies on the choice of variogram model and the density and quality of the input data.
+
+While the predictions offer valuable insights, it is important to acknowledge potential uncertainties, particularly near the edges of the study area or in regions with sparse data. The smooth transitions in predicted values also mask potential local variations that may exist. Despite these limitations, Ordinary Kriging serves as an effective tool for spatial interpolation, offering a balance between precision and practical application in geostatistical analyses.
