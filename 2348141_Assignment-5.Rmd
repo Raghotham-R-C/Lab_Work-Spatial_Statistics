@@ -1,0 +1,141 @@
+---
+title: "2348141_Assignment 5"
+author: "Raghotham (2348141)"
+date: "2024-11-09"
+output:
+  word_document: default
+  html_document: default
+---
+
+## Introduction :
+
+Variograms are essential tools for understanding spatial dependence in data, capturing how similarity between values changes with distance. By plotting an empirical variogram, we can visualize the spatial structure, revealing key insights about how variables—like zinc concentration—are distributed across space. The variogram’s shape informs us about spatial correlation, while parameters like nugget, range, and partial sill quantify aspects of spatial continuity and variability. 
+
+Fitting a theoretical variogram model to this empirical structure allows us to predict values at unsampled locations using techniques such as kriging, which is widely applied in environmental science, mining, and agriculture. This study will explore various variogram models to assess the spatial dependence of zinc concentrations and select the best-fitting model for accurate spatial prediction.
+
+## Objective :
+
+Choose your choice of data set from the package “gstat” and generate the spatial points of 250 samples and perform the following for both data set.
+
+1. Describe the basic structure of an empirical variogram. What does the variogram represent, and why do we compute it in spatial analysis. Plot the empirical variogram and examine the shape. Identify the range of distances in the variogram plot. Why is this important when fitting a theoretical variogram model?
+
+2. Explain the significance of each parameter in a variogram model
+
+3. Plot the empirical variogram and the fitted spherical model together. Comment on the fit of the model. Does it capture the observed spatial structure well?
+
+4. Compare the spherical model to any additional model you fit. Which model provides a better fit and based on your fitted model, explain how spatial correlation changes with distance in this dataset.
+
+## Data Description :
+
+This data set gives locations and top soil heavy metal concentrations (ppm), along with a number
+of soil and landscape variables, collected in a flood plain of the river Meuse, near the village Stein.
+Heavy metal concentrations are bulk sampled from an area of approximately 15 m x 15 m.
+
+- **sample** sample number
+- **x** a numeric vector; x-coordinate (m) in RDM (Dutch topographical map coordinates)
+- **y** a numeric vector; y-coordinate (m) in RDM (Dutch topographical map coordinates)
+- **cadmium** topsoil cadmium concentration, ppm.; note that zero cadmium values in the original data set have been shifted to 0.2 (half the lowest non-zero value)
+- **copper** topsoil copper concentration, ppm.
+- **lead** topsoil lead concentration, ppm.
+- **zinc** topsoil zinc concentration, ppm.
+- **elev** relative elevation
+- **om** organic matter, as percentage
+- **ffreq** flooding frequency class
+- **soil** soil type
+- **lime** lime class
+- **landuse** landuse class
+
+## Analysis :
+
+An **Empirical variogram** measures spatial dependence by comparing the variance of values separated by certain distances. The variogram helps to assess how variable the values are over space. The structure of an empirical variogram consists of the following main components:
+
+- **Lag Distance (x-axis):** The horizontal axis represents the distance (lag) between pairs of sample points. Data points are grouped into distance bins, with each bin representing a range of distances between sample pairs.
+
+- **Semivariance (y-axis):** The vertical axis shows the semivariance for each distance bin. Semivariance measures how dissimilar points are as they get farther apart, calculated as half the average squared difference between values separated by each lag distance.
+
+- **Nugget:** The intercept or starting point of the variogram at zero distance. A nugget effect indicates small-scale variability or measurement error that persists even at very short distances.
+
+- **Sill:** The value at which the variogram levels off, indicating the total variance in the dataset. Beyond this point, semivariance no longer increases with distance, as points are no longer spatially correlated.
+
+- **Range:** The distance at which the variogram reaches the sill. This is the maximum distance where spatial correlation exists; beyond this range, points are assumed to be uncorrelated.
+
+from analysing the variogram value we can identify patterns in spatial variability and quantify how correlation between values changes with distance.
+
+```{r}
+# Load necessary packages
+library(gstat)
+library(sp)
+library(ggplot2)
+
+# Load the meuse dataset
+data("meuse", package = "sp")
+
+# Convert meuse dataset to spatial points data frame
+coordinates(meuse) <- ~x+y
+
+# Subset to 250 samples (if fewer than 250, use the entire dataset)
+set.seed(123)  # Set seed for reproducibility
+if (nrow(meuse) > 250) {
+  meuse_sample <- meuse[sample(1:nrow(meuse), 250), ]
+} else {
+  meuse_sample <- meuse
+}
+```
+
+```{r}
+# Compute the empirical variogram
+vg_empirical <- variogram(log(zinc) ~ 1, meuse_sample)
+
+# Plot the empirical variogram
+plot(vg_empirical, main = "Empirical Variogram of Zinc Concentration")
+```
+
+```{r}
+# Fit a spherical model
+vg_spherical <- fit.variogram(vg_empirical, model = vgm(3, "Sph", 1000, 0.1))
+
+# Plot empirical and Fitted Spherical Variogram
+plot(vg_empirical, model = vg_spherical, main = "Empirical and Fitted Spherical Variogram")
+
+```
+
+```{r}
+print(vg_spherical)
+```
+
+**Interpretation**
+
+
+- The fitted variogram model includes a nugget effect and a spherical model component. The nugget, with a psill of 0.05066, represents the variability at very short distances, often due to measurement error or small-scale spatial variability that cannot be resolved by the sampling scale. This low nugget value suggests that measurement error or microscale variability is minimal in the data.
+
+- The spherical component has a psill of 0.5906 and a range of approximately 897 units. This means that spatial correlation exists up to about 897 units. The majority of the spatial variation is captured by the structured component (spherical model), indicating that values closer together are more similar, with spatial dependence decreasing until it reaches the sill.
+
+```{r}
+# Fit an exponential model
+vg_exponential <- fit.variogram(vg_empirical, model = vgm(3, "Exp", 1000, 0.1))
+
+# Plot empirical and Fitted Exponential Variogram
+plot(vg_empirical, model = vg_exponential, main = "Empirical and Fitted Exponential Variogram")
+```
+```{r}
+print(vg_exponential)
+```
+
+**Interpretation**
+
+- The fitted variogram model for the exponential structure includes a nugget effect with a psill of 0, indicating no observable small-scale variability or measurement error.
+
+- This absence of a nugget effect implies a clean spatial structure, suggesting that any variability is due to spatial correlation rather than random noise at short distances.
+
+- The exponential component has a psill of 0.7187 and a range of approximately 450 units, meaning spatial correlation exists up to this distance before it diminishes. 
+
+- Compared to the spherical model, the shorter range of the exponential model suggests spatial dependence over shorter distances, with a more gradual decline in correlation beyond this range, characteristic of the exponential model’s structure.
+
+## Conclusion :
+
+The Variogram analysis of zinc concentration data reveals valuable insights into the spatial structure and correlation over distance. The spherical model, with a moderate nugget effect and a longer range of about 897 units, suggests a clear spatial dependency extending over larger distances, indicating that nearby values tend to be more similar up to this threshold. This model’s fit captures broader spatial patterns effectively, making it suitable for predicting values at locations within this range.
+
+On the other hand, the exponential model, with no nugget effect and a shorter range of around 450 units, captures a more localized spatial correlation. This model suggests that spatial dependence exists over shorter distances with a gradual decline, which might be more appropriate for data exhibiting stronger, local spatial patterns. By comparing these models, the spherical model may be better suited for applications requiring broader spatial predictions, while the exponential model could be ideal for capturing finer spatial details. This analysis ultimately enhances our understanding of spatial variation in zinc concentrations, supporting more informed decisions in spatial prediction and environmental assessment.
+
+
+
